@@ -2,3 +2,7 @@ dist/*.dmg
 dist/mac-arm64/
 dist/mac/
 node_modules/electron/dist/
+dist/*.dmg
+dist/mac-arm64/
+dist/mac/
+node_modules/electron/dist/
