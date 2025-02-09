@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bitcoin Wallet Generator</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container mt-5">
+      <h2 class="text-center">Bitcoin Wallet Generator</h2>
+
+      <!-- File Upload Section -->
+      <div class="mb-3">
+        <label for="fileInput" class="form-label">Upload Keyword File</label>
+        <input class="form-control" type="file" id="fileInput" accept=".txt" />
+      </div>
+
+      <!-- Control Buttons -->
+      <div class="d-flex gap-2">
+        <button id="processBtn" class="btn btn-primary w-100">
+          Generate Wallets
+        </button>
+        <button id="stopBtn" class="btn btn-danger w-100" disabled>Stop</button>
+        <button id="continueBtn" class="btn btn-success w-100" disabled>
+          Continue
+        </button>
+      </div>
+
+      <!-- Loader -->
+      <div id="loader" class="text-center mt-3" style="display: none">
+        <img src="assets/loader.gif" alt="Loading..." width="50" />
+        <p>Processing...</p>
+      </div>
+
+      <!-- Results Table -->
+      <div class="table-responsive mt-4">
+        <table class="table table-bordered" id="resultsTable">
+          <thead>
+            <tr>
+              <th>Hex (SHA-256)</th>
+              <th>Legacy (P2PKH)</th>
+              <th>Script (P2SH)</th>
+              <th>SegWit (P2WPKH)</th>
+              <th>Taproot (P2TR)</th>
+              <th>Balance</th>
+              <th>Transactions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Results will be dynamically inserted here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>

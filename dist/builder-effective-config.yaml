@@ -1,0 +1,14 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.bitcoin.walletgenerator
+mac:
+  target:
+    - target: dmg
+      arch: arm64
+    - target: dmg
+      arch: x64
+  hardenedRuntime: true
+  gatekeeperAssess: false
+files: []
+electronVersion: 34.1.1
