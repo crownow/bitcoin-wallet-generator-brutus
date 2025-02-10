@@ -1,15 +1,31 @@
 const workerpool = require("workerpool");
 const bitcoin = require("bitcoinjs-lib");
+const ECPairFactory = require("ecpair").default;
+const tinysecp = require("tiny-secp256k1");
+
+// ✅ Проверяем, загружена ли библиотека
+try {
+  if (!tinysecp || !tinysecp.isPoint) {
+    throw new Error("tiny-secp256k1 is not working properly in worker");
+  }
+
+  bitcoin.initEccLib(tinysecp);
+  console.log("✅ Worker ECC library initialized successfully!");
+} catch (error) {
+  console.error("❌ Worker ECC library failed to initialize:", error);
+  process.exit(1);
+}
+
+const ECPair = ECPairFactory(tinysecp);
 
 // Функция для обработки фразы
 function processPhrase(phrase) {
   try {
     const hash = bitcoin.crypto.sha256(Buffer.from(phrase)).toString("hex");
+    const privateKeyBuffer = Buffer.from(hash, "hex");
 
     // Генерируем ключи
-    const keyPair = bitcoin.ECPair.fromPrivateKey(Buffer.from(hash, "hex"), {
-      compressed: true,
-    });
+    const keyPair = ECPair.fromPrivateKey(privateKeyBuffer);
 
     return {
       privateKeyHex: hash,
