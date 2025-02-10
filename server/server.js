@@ -6,7 +6,6 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
 const http = require("http");
-const sticky = require("sticky-cluster"); // Используем sticky-cluster
 const { Server } = require("socket.io");
 const pLimit = require("p-limit");
 const os = require("os");
@@ -60,9 +59,10 @@ async function processFile(filePath, socketId) {
     input: fileStream,
     crlfDelay: Infinity,
   });
+
   let processedCount = 0;
   let walletFoundCount = 0;
-  // Получаем клиентский сокет по socketId (если он ещё подключён)
+  // Получаем клиентский сокет по socketId (если он подключён)
   const socket = io.sockets.sockets.get(socketId);
   const tasks = [];
 
@@ -141,8 +141,7 @@ const pool = workerpool.pool(path.join(__dirname, "workerTask.js"), {
 
 const PORT = process.env.PORT || 3000;
 
-// Запускаем сервер с использованием sticky-cluster для sticky sessions.
-// В рабочем процессе будет вызван переданный callback.
-sticky(server, PORT, () => {
-  console.log("Worker " + process.pid + " is listening on port " + PORT);
+// Запускаем сервер без кластеризации
+server.listen(PORT, () => {
+  console.log("Server listening on port " + PORT);
 });
