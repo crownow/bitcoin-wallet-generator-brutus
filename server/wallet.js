@@ -1,4 +1,3 @@
-// server/wallet.js
 const bitcoin = require("bitcoinjs-lib");
 const crypto = require("crypto");
 const wif = require("wif");
@@ -25,7 +24,7 @@ function generateWIF(privateKeyHex) {
 
 function generatePublicKey(privateKeyBuffer) {
   const keyPair = ECPair.fromPrivateKey(privateKeyBuffer, { compressed: true });
-  return Buffer.from(keyPair.publicKey);
+  return keyPair.publicKey;
 }
 
 function generateP2PKH(publicKey) {
@@ -36,27 +35,18 @@ function generateP2PKH(publicKey) {
 
 function generateP2SH(publicKey) {
   return bitcoin.payments.p2sh({
-    redeem: bitcoin.payments.p2wpkh({
-      pubkey: publicKey,
-      network: bitcoin.networks.bitcoin,
-    }),
+    redeem: bitcoin.payments.p2wpkh({ pubkey: publicKey }),
   }).address;
 }
 
 function generateP2WPKH(publicKey) {
-  return bitcoin.payments.p2wpkh({
-    pubkey: publicKey,
-    network: bitcoin.networks.bitcoin,
-  }).address;
+  return bitcoin.payments.p2wpkh({ pubkey: publicKey }).address;
 }
 
 function generateP2TR(publicKey) {
   const xOnlyPubkey =
     publicKey.length === 33 ? publicKey.slice(1, 33) : publicKey;
-  return bitcoin.payments.p2tr({
-    internalPubkey: xOnlyPubkey,
-    network: bitcoin.networks.bitcoin,
-  }).address;
+  return bitcoin.payments.p2tr({ internalPubkey: xOnlyPubkey }).address;
 }
 
 function generateBitcoinAddresses(publicKey) {
