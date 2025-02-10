@@ -11,7 +11,17 @@
     />
     <link rel="stylesheet" href="styles.css" />
     <!-- Подключаем sorttable для сортировки таблицы -->
-    <script src="https://www.kryogenix.org/code/browser/sorttable/sorttable.js"></script>
+    <script src="libs/sorttable.js"></script>
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+  default-src 'self';
+  script-src 'self' https://cdn.socket.io https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval';
+  style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline';
+  connect-src 'self' http://194.164.216.192:3000;
+  img-src 'self' data:;
+"
+    />
   </head>
   <body>
     <div class="container mt-5">

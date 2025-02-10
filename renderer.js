@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Подключаемся к серверу через Socket.io
-  const socket = io("http://localhost:3000");
+  const socket = io("http://194.164.216.192:3000");
 
   socket.on("connect", () => {
     console.log("Connected via socket.io, socket id:", socket.id);

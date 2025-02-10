@@ -3,7 +3,8 @@ const { app, BrowserWindow } = require("electron");
 const path = require("path");
 
 let mainWindow;
-
+app.commandLine.appendSwitch("ignore-certificate-errors", "true");
+app.commandLine.appendSwitch("allow-insecure-localhost", "true");
 app.whenReady().then(() => {
   mainWindow = new BrowserWindow({
     width: 900,
