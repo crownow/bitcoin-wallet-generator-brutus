@@ -1,6 +1,9 @@
+// server/api.js
 const axios = require("axios");
 
 const ELECTRUMX_URL = process.env.ELECTRUMX_URL;
+// Простой in-memory cache для результатов запросов
+const balanceCache = new Map();
 
 async function electrumRequest(method, params) {
   try {
@@ -12,23 +15,27 @@ async function electrumRequest(method, params) {
     });
     return response.data.result;
   } catch (error) {
-    console.error(`❌ Ошибка ElectrumX RPC (${method}):`, error.message);
+    console.error(`❌ Error ElectrumX RPC (${method}):`, error.message);
     return null;
   }
 }
 
 async function getWalletBalance(addresses) {
   const results = {};
-
   for (const [type, address] of Object.entries(addresses)) {
-    console.log(`🟢 Проверка баланса для ${type}: ${address}`);
-    results[type] = await electrumRequest("blockchain.address.get_balance", [
-      address,
-    ]);
+    if (balanceCache.has(address)) {
+      console.log(`Cache hit for ${address}`);
+      results[type] = balanceCache.get(address);
+    } else {
+      console.log(`Checking balance for ${address}`);
+      const result = await electrumRequest("blockchain.address.get_balance", [
+        address,
+      ]);
+      results[type] = result;
+      balanceCache.set(address, result);
+    }
   }
-
   return results;
 }
 
-module.exports = { getWalletBalance };
-
+module.exports = { electrumRequest, getWalletBalance };

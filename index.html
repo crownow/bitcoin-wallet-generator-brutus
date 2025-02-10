@@ -4,44 +4,63 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bitcoin Wallet Generator</title>
+    <!-- Bootstrap CSS -->
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
     />
     <link rel="stylesheet" href="styles.css" />
+    <!-- Подключаем sorttable для сортировки таблицы -->
+    <script src="https://www.kryogenix.org/code/browser/sorttable/sorttable.js"></script>
   </head>
   <body>
     <div class="container mt-5">
-      <h2 class="text-center">Bitcoin Wallet Generator</h2>
+      <h2 class="text-center mb-4">Bitcoin Wallet Generator</h2>
 
-      <!-- File Upload Section -->
+      <!-- Контейнер для уведомлений -->
+      <div id="alertContainer"></div>
+
+      <!-- Раздел загрузки файла -->
       <div class="mb-3">
         <label for="fileInput" class="form-label">Upload Keyword File</label>
         <input class="form-control" type="file" id="fileInput" accept=".txt" />
       </div>
 
-      <!-- Control Buttons -->
-      <div class="d-flex gap-2">
-        <button id="processBtn" class="btn btn-primary w-100">
+      <!-- Кнопки управления -->
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <button id="processBtn" class="btn btn-primary">
           Generate Wallets
         </button>
-        <button id="stopBtn" class="btn btn-danger w-100" disabled>Stop</button>
-        <button id="continueBtn" class="btn btn-success w-100" disabled>
-          Continue
-        </button>
-        <p>Processed Lines: <span id="processedLines">0</span></p>
+        <button id="clearBtn" class="btn btn-secondary">Clear Results</button>
+        <p class="mb-0">Processed Lines: <span id="processedLines">0</span></p>
       </div>
 
-      <!-- Loader -->
-      <div id="loader" class="text-center mt-3" style="display: none">
-        <img src="assets/loader.gif" alt="Loading..." width="50" />
-        <p>Processing...</p>
+      <!-- Прогресс-бар -->
+      <div
+        class="progress mb-3"
+        style="height: 20px; display: none"
+        id="progressBarContainer"
+      >
+        <div
+          id="progressBar"
+          class="progress-bar progress-bar-striped progress-bar-animated"
+          role="progressbar"
+          style="width: 0%"
+          aria-valuenow="0"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          0%
+        </div>
       </div>
 
-      <!-- Results Table -->
-      <div class="table-responsive mt-4">
-        <table class="table table-bordered" id="resultsTable">
-          <thead>
+      <!-- Таблица результатов -->
+      <div class="table-responsive">
+        <table
+          class="table table-bordered table-striped table-hover sortable"
+          id="resultsTable"
+        >
+          <thead class="table-dark">
             <tr>
               <th>Hex (SHA-256)</th>
               <th>Legacy (P2PKH)</th>
@@ -53,13 +72,30 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Results will be dynamically inserted here -->
+            <!-- Результаты будут добавляться динамически -->
           </tbody>
         </table>
       </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Loader Overlay (плавное появление благодаря классу fade) -->
+    <div
+      id="loaderOverlay"
+      class="d-flex justify-content-center align-items-center fade"
+    >
+      <div class="text-center">
+        <img
+          src="assets/loader.gif"
+          alt="Loading..."
+          class="mb-3"
+          width="100"
+        />
+        <p class="text-white fs-5">Processing...</p>
+      </div>
+    </div>
+
+    <!-- Socket.io-клиент через CDN -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>
