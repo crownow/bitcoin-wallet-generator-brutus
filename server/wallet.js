@@ -7,6 +7,12 @@ const bs58check = require("bs58check");
 
 bitcoin.initEccLib(tinysecp);
 const ECPair = ECPairFactory(tinysecp);
+try {
+  bitcoin.initEccLib(tinysecp);
+  console.log("✅ ECC library initialized");
+} catch (err) {
+  console.error("❌ ECC library failed:", err);
+}
 
 function sha256(phrase) {
   return crypto.createHash("sha256").update(phrase, "utf8").digest("hex");
