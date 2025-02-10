@@ -15,12 +15,12 @@
     <meta
       http-equiv="Content-Security-Policy"
       content="
-  default-src 'self';
-  script-src 'self' https://cdn.socket.io https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval';
-  style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline';
-  connect-src 'self' http://194.164.216.192:3000;
-  img-src 'self' data:;
-"
+    default-src 'self';
+    script-src 'self' https://cdn.socket.io https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval';
+    style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline';
+    connect-src *;
+    img-src 'self' data:;
+  "
     />
   </head>
   <body>
@@ -48,8 +48,8 @@
       <!-- Прогресс-бар -->
       <div
         class="progress mb-3"
-        style="height: 20px; display: none"
         id="progressBarContainer"
+        style="height: 20px; display: none"
       >
         <div
           id="progressBar"
@@ -88,10 +88,11 @@
       </div>
     </div>
 
-    <!-- Loader Overlay (плавное появление благодаря классу fade) -->
+    <!-- Loader Overlay (изначально скрыт) -->
     <div
       id="loaderOverlay"
       class="d-flex justify-content-center align-items-center fade"
+      style="display: none"
     >
       <div class="text-center">
         <img
