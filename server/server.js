@@ -155,7 +155,7 @@ async function processFile(filePath, socketId) {
 }
 
 // Создаём пул воркеров для CPU-интенсивной обработки (workerpool)
-const pool = workerpool.pool(path.join(__dirname, "workerTask.js"), {
+const pool = workerpool.pool(path.join(__dirname, "./workerTask.js"), {
   maxWorkers: os.cpus().length,
 });
 
