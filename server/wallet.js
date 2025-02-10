@@ -4,12 +4,11 @@ const ECPairFactory = require("ecpair").default;
 const tinysecp = require("tiny-secp256k1");
 const bitcoin = require("bitcoinjs-lib");
 
+// Проверка библиотеки ECC
 try {
-  // ✅ Проверяем, действительно ли tiny-secp256k1 работает
   if (!tinysecp || !tinysecp.isPoint) {
     throw new Error("tiny-secp256k1 is not working properly");
   }
-
   bitcoin.initEccLib(tinysecp);
   console.log("✅ ECC library initialized successfully!");
 } catch (error) {
@@ -35,25 +34,32 @@ function generateWIF(privateKeyHex) {
 
 function generatePublicKey(privateKeyBuffer) {
   const keyPair = ECPair.fromPrivateKey(privateKeyBuffer);
-  return {
-    compressed: keyPair.publicKey,
-    uncompressed: Buffer.concat([
-      Buffer.from([0x04]),
-      keyPair.publicKey.slice(1, 33),
-      keyPair.publicKey.slice(33, 65),
-    ]),
-  };
+
+  // Преобразуем Uint8Array в Buffer
+  const compressed = Buffer.from(keyPair.publicKey);
+  const uncompressed = Buffer.concat([
+    Buffer.from([0x04]),
+    keyPair.publicKey.slice(1, 33),
+    keyPair.publicKey.slice(33, 65),
+  ]);
+
+  return { compressed, uncompressed };
 }
 
 function generateBitcoinAddresses(publicKey) {
   return {
-    p2pkh: bitcoin.payments.p2pkh({ pubkey: publicKey.compressed }).address,
+    p2pkh: bitcoin.payments.p2pkh({ pubkey: Buffer.from(publicKey.compressed) })
+      .address,
     p2sh: bitcoin.payments.p2sh({
-      redeem: bitcoin.payments.p2wpkh({ pubkey: publicKey.compressed }),
+      redeem: bitcoin.payments.p2wpkh({
+        pubkey: Buffer.from(publicKey.compressed),
+      }),
     }).address,
-    p2wpkh: bitcoin.payments.p2wpkh({ pubkey: publicKey.compressed }).address,
+    p2wpkh: bitcoin.payments.p2wpkh({
+      pubkey: Buffer.from(publicKey.compressed),
+    }).address,
     p2tr: bitcoin.payments.p2tr({
-      internalPubkey: publicKey.compressed.slice(1, 33),
+      internalPubkey: Buffer.from(publicKey.compressed.slice(1, 33)),
     }).address,
   };
 }
