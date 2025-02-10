@@ -6,7 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
 const http = require("http");
-const sticky = require("sticky-session"); // Новый модуль для sticky sessions
+const sticky = require("sticky-cluster"); // Используем sticky-cluster
 const { Server } = require("socket.io");
 const pLimit = require("p-limit");
 const os = require("os");
@@ -18,7 +18,6 @@ const { getWalletBalance } = require("./api");
 
 // Настройка Prometheus: сбор дефолтных метрик
 client.collectDefaultMetrics();
-// Создаём кастомные метрики
 const processedCounter = new client.Counter({
   name: "processed_lines_total",
   help: "Total number of processed lines",
@@ -61,7 +60,6 @@ async function processFile(filePath, socketId) {
     input: fileStream,
     crlfDelay: Infinity,
   });
-
   let processedCount = 0;
   let walletFoundCount = 0;
   // Получаем клиентский сокет по socketId (если он ещё подключён)
@@ -126,28 +124,25 @@ async function processFile(filePath, socketId) {
   });
 }
 
-// Создаем HTTP-сервер из Express-приложения
+// Создаём HTTP-сервер из Express-приложения
 const server = http.createServer(app);
 
-// Создаем экземпляр Socket.IO
+// Создаём экземпляр Socket.IO
 const io = new Server(server);
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
   socket.emit("message", "Connected to server");
 });
 
-// Создаем пул воркеров для CPU-интенсивной обработки (workerpool)
+// Создаём пул воркеров для CPU-интенсивной обработки (workerpool)
 const pool = workerpool.pool(path.join(__dirname, "workerTask.js"), {
   maxWorkers: os.cpus().length,
 });
 
-// Используем sticky-session для запуска сервера с sticky sessions
 const PORT = process.env.PORT || 3000;
-if (!sticky.listen(server, PORT)) {
-  // Это мастер-процесс sticky-session; он не обрабатывает HTTP-запросы.
-  console.log("Master process " + process.pid + " is running");
-  process.exit();
-} else {
-  // Это рабочий процесс; он обрабатывает подключения.
+
+// Запускаем сервер с использованием sticky-cluster для sticky sessions.
+// В рабочем процессе будет вызван переданный callback.
+sticky(server, PORT, () => {
   console.log("Worker " + process.pid + " is listening on port " + PORT);
-}
+});
