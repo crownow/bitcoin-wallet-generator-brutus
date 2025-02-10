@@ -1,11 +1,15 @@
 const processBtn = document.getElementById("processBtn");
 const stopBtn = document.getElementById("stopBtn");
 const continueBtn = document.getElementById("continueBtn");
+const processedLinesElement = document.getElementById("processedLines"); // ✅ Counter element
 
 let isProcessing = false;
 let lastProcessedIndex = 0;
 let phrases = [];
-const CHUNK_SIZE = 1024 * 1024; // 1MB чанки
+let processedLines = 0; // ✅ Counter for processed lines
+const CHUNK_SIZE = 512 * 1024; // 512KB instead of 1MB
+const MAX_PHRASES_BATCH = 500; // Limit batch size
+let lastChunk = ""; // Buffer for incomplete lines
 
 processBtn.addEventListener("click", async () => {
   const fileInput = document.getElementById("fileInput").files[0];
@@ -23,23 +27,34 @@ processBtn.addEventListener("click", async () => {
   isProcessing = true;
   lastProcessedIndex = 0;
   phrases = [];
+  lastChunk = ""; // Clear buffer
+  processedLines = 0; // ✅ Reset counter
 
   function processChunk(chunk) {
-    const lines = chunk
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
+    const fullData = lastChunk + chunk;
+    const lines = fullData.split("\n");
+
+    lastChunk = lines.pop() || ""; // Save incomplete line for next chunk
 
     phrases.push(...lines);
+    processedLines += lines.length; // ✅ Increment counter
 
-    if (phrases.length >= 1000) {
+    // ✅ Update the UI counter in real-time
+    processedLinesElement.textContent = processedLines;
+
+    if (phrases.length >= MAX_PHRASES_BATCH) {
       window.electron.send("process-keywords", phrases);
       phrases = [];
+
+      // Force garbage collection
+      if (global.gc) {
+        global.gc();
+      }
     }
   }
 
   function readNextChunk(offset) {
-    if (!isProcessing) return; // Прекращаем обработку, если нажата "Стоп"
+    if (!isProcessing) return;
 
     const reader = new FileReader();
 
@@ -47,31 +62,32 @@ processBtn.addEventListener("click", async () => {
       processChunk(event.target.result);
 
       offset += CHUNK_SIZE;
-      lastProcessedIndex = offset; // Запоминаем место остановки
+      lastProcessedIndex = offset;
 
       if (offset < fileInput.size) {
-        readNextChunk(offset);
+        setTimeout(() => readNextChunk(offset), 0);
       } else {
         if (phrases.length > 0) {
           window.electron.send("process-keywords", phrases);
         }
         stopBtn.disabled = true;
+        document.getElementById("loader").style.display = "none";
       }
     };
 
     reader.onerror = function (error) {
-      console.error("❌ Ошибка чтения файла:", error);
+      console.error("❌ File read error:", error);
       document.getElementById("loader").style.display = "none";
     };
 
     const slice = fileInput.slice(offset, offset + CHUNK_SIZE);
-    reader.readAsText(slice);
+    reader.readAsText(slice, "ISO-8859-1");
   }
 
   readNextChunk(0);
 });
 
-// 📩 Получаем обработанные данные
+// 📩 Receive processed wallet data
 window.electron.receive("wallet-data", (wallets) => {
   document.getElementById("loader").style.display = "none";
   processBtn.disabled = false;
@@ -81,7 +97,7 @@ window.electron.receive("wallet-data", (wallets) => {
   const tableBody = document.querySelector("#resultsTable tbody");
   tableBody.innerHTML = "";
 
-  console.log("📩 Получены данные кошельков:", wallets);
+  console.log("📩 Received wallet data:", wallets);
 
   const filteredWallets = wallets.filter((wallet) =>
     Object.values(wallet.balance).some(
@@ -89,11 +105,11 @@ window.electron.receive("wallet-data", (wallets) => {
     )
   );
 
-  console.log("✅ Отфильтрованные кошельки:", filteredWallets);
+  console.log("✅ Filtered wallets:", filteredWallets);
 
   if (filteredWallets.length === 0) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="7" style="text-align: center;">Нет кошельков с балансом или транзакциями</td>`;
+    row.innerHTML = `<td colspan="7" style="text-align: center;">No wallets with balance or transactions found</td>`;
     tableBody.appendChild(row);
     return;
   }
@@ -102,11 +118,11 @@ window.electron.receive("wallet-data", (wallets) => {
     const row = document.createElement("tr");
 
     row.innerHTML = `
-      <td>${wallet.privateKeyHex || "Ошибка"}</td>
-      <td>${wallet.addresses.p2pkh || "Ошибка"}</td>
-      <td>${wallet.addresses.p2sh || "Ошибка"}</td>
-      <td>${wallet.addresses.p2wpkh || "Ошибка"}</td>
-      <td>${wallet.addresses.p2tr || "Ошибка"}</td>
+      <td>${wallet.privateKeyHex || "Error"}</td>
+      <td>${wallet.addresses.p2pkh || "Error"}</td>
+      <td>${wallet.addresses.p2sh || "Error"}</td>
+      <td>${wallet.addresses.p2wpkh || "Error"}</td>
+      <td>${wallet.addresses.p2tr || "Error"}</td>
       <td>${wallet.balance.p2pkh?.balance || 0}</td>
       <td>${wallet.balance.p2pkh?.transactions || 0}</td>
     `;
@@ -115,19 +131,19 @@ window.electron.receive("wallet-data", (wallets) => {
   });
 });
 
-// 🔴 Кнопка "Стоп" - Останавливает процесс
+// 🔴 Stop Button - Stops processing
 stopBtn.addEventListener("click", () => {
   isProcessing = false;
   stopBtn.disabled = true;
   continueBtn.disabled = false;
   window.electron.send("stop-processing");
-  console.log("⏹ Остановка обработки");
+  console.log("⏹ Processing stopped");
 });
 
-// ▶️ Кнопка "Продолжить" - Возобновляет процесс с места остановки
+// ▶️ Continue Button - Resumes processing from last position
 continueBtn.addEventListener("click", () => {
   if (!isProcessing) {
-    console.log("▶️ Продолжаем обработку с индекса", lastProcessedIndex);
+    console.log("▶️ Resuming from index", lastProcessedIndex);
     document.getElementById("loader").style.display = "block";
     processBtn.disabled = true;
     stopBtn.disabled = false;
