@@ -1,10 +1,16 @@
 const workerpool = require("workerpool");
 const bitcoin = require("bitcoinjs-lib");
 
+// Функция для обработки фразы
 function processPhrase(phrase) {
   try {
     const hash = bitcoin.crypto.sha256(Buffer.from(phrase)).toString("hex");
-    const keyPair = bitcoin.ECPair.fromPrivateKey(Buffer.from(hash, "hex"));
+
+    // Генерируем ключи
+    const keyPair = bitcoin.ECPair.fromPrivateKey(Buffer.from(hash, "hex"), {
+      compressed: true,
+    });
+
     return {
       privateKeyHex: hash,
       addresses: {
@@ -19,8 +25,8 @@ function processPhrase(phrase) {
       },
     };
   } catch (err) {
-    console.error("Error in worker:", err);
-    return { error: err.message };
+    console.error("❌ Error in worker:", err);
+    return { error: err.message, phrase };
   }
 }
 

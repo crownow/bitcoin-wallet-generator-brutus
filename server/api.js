@@ -21,21 +21,23 @@ async function electrumRequest(method, params) {
 }
 
 async function getWalletBalance(addresses) {
-  const results = {};
-  for (const [type, address] of Object.entries(addresses)) {
-    if (balanceCache.has(address)) {
-      console.log(`Cache hit for ${address}`);
-      results[type] = balanceCache.get(address);
-    } else {
-      console.log(`Checking balance for ${address}`);
-      const result = await electrumRequest("blockchain.address.get_balance", [
-        address,
-      ]);
-      results[type] = result;
-      balanceCache.set(address, result);
+  try {
+    console.log("📡 Checking balance for addresses:", addresses);
+
+    if (!addresses || typeof addresses !== "object") {
+      throw new Error("Invalid addresses input");
     }
+
+    for (const [type, address] of Object.entries(addresses)) {
+      console.log(`🔍 Checking balance for ${type}: ${address}`);
+    }
+
+    // Здесь должен быть код обращения к API балансов
+    return {}; // Временный заглушка
+  } catch (err) {
+    console.error("❌ Error in getWalletBalance:", err);
+    return null;
   }
-  return results;
 }
 
 module.exports = { electrumRequest, getWalletBalance };
