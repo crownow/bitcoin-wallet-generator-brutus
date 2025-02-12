@@ -1,11 +1,11 @@
 const sqlite3 = require("sqlite3").verbose();
 const fs = require("fs");
-const { exec } = require("child_process");
+const { spawn } = require("child_process");
 
 const dbFile = "wallets.db";
-const sqlFile = "/root/wallets.sql"; // Путь к SQL-файлу
+const sqlFile = "/root/wallets.sql"; // Убедись, что путь правильный!
 
-// Проверяем, существует ли файл
+// Проверяем, существует ли файл SQL
 if (!fs.existsSync(sqlFile)) {
   console.error(`❌ Файл ${sqlFile} не найден!`);
   process.exit(1);
@@ -19,19 +19,26 @@ const db = new sqlite3.Database(dbFile, (err) => {
   }
   console.log("✅ Подключение к базе установлено.");
 
-  // Запускаем импорт SQL-файла в базу
   console.log("⏳ Начинаем импорт SQL-файла в базу...");
 
-  exec(`sqlite3 ${dbFile} < ${sqlFile}`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`❌ Ошибка выполнения SQL-файла: ${error.message}`);
-      return;
+  // Используем spawn вместо exec, чтобы не переполнялся буфер памяти
+  const sqliteProcess = spawn("sqlite3", [dbFile]);
+
+  // Читаем SQL-файл построчно и передаем в stdin SQLite
+  const sqlStream = fs.createReadStream(sqlFile);
+  sqlStream.pipe(sqliteProcess.stdin);
+
+  sqliteProcess.on("close", (code) => {
+    if (code === 0) {
+      console.log("🎉 Импорт завершён!");
+    } else {
+      console.error(`❌ Ошибка импорта. Код выхода: ${code}`);
     }
-    if (stderr) {
-      console.error(`⚠️ Ошибка SQL: ${stderr}`);
-    }
-    console.log("🎉 Импорт завершён!");
     db.close();
+  });
+
+  sqliteProcess.stderr.on("data", (data) => {
+    console.error(`❌ Ошибка SQL: ${data}`);
   });
 
   // Выводим количество записей каждые 10 секунд
@@ -45,5 +52,5 @@ const db = new sqlite3.Database(dbFile, (err) => {
         );
       }
     });
-  }, 10000); // Запрашиваем каждые 10 секунд
+  }, 10000); // Обновление каждые 10 сек.
 });
