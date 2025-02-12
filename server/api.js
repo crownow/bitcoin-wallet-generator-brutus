@@ -8,7 +8,15 @@ const BITCOIN_CLI_CMD = `bitcoin-cli -rpcuser=${RPC_USER} -rpcpassword=${RPC_PAS
 function runBitcoinCli(command, params = []) {
   try {
     const cmd = `${BITCOIN_CLI_CMD} ${command} ${params.join(" ")}`;
+    console.log(`🔄 Executing: ${cmd}`);
     const output = execSync(cmd, { encoding: "utf-8" });
+
+    if (!output || output.trim() === "") {
+      throw new Error(
+        `Empty response from Bitcoin Core for command: ${command}`
+      );
+    }
+
     return JSON.parse(output);
   } catch (error) {
     console.error(`❌ Error Bitcoin Core RPC (${command}):`, error.message);
@@ -18,19 +26,24 @@ function runBitcoinCli(command, params = []) {
 
 // Проверить статус scantxoutset
 function isScanInProgress() {
-  const status = runBitcoinCli("scantxoutset", ["status"]);
-  return status && status.progress < 1.0;
+  try {
+    const status = runBitcoinCli("scantxoutset", ["status"]);
+    return status && status.progress < 1.0;
+  } catch (error) {
+    console.error("⚠️ Error checking scantxoutset status:", error.message);
+    return false;
+  }
 }
 
-// Запуск scantxoutset с ожиданием
+// Ждем, пока идет сканирование
 function waitForScan() {
   while (isScanInProgress()) {
-    console.log("⏳ Scan in progress, waiting...");
+    console.log("⏳ Scan in progress, waiting 5 seconds...");
     setTimeout(() => {}, 5000);
   }
 }
 
-// Получение баланса через scantxoutset (оптимизированный)
+// Получение баланса через scantxoutset
 async function getWalletBalance(addresses) {
   const balances = {};
   const addrList = Object.values(addresses)
@@ -51,16 +64,23 @@ async function getWalletBalance(addresses) {
       } addresses...`
     );
     const output = execSync(cmd, { encoding: "utf-8" });
+
+    if (!output || output.trim() === "") {
+      throw new Error("Empty response from Bitcoin Core scantxoutset");
+    }
+
     const result = JSON.parse(output);
 
-    if (result.success) {
-      for (const unspent of result.unspents) {
-        const addr = unspent.desc.match(/addr\((.*?)\)/)[1];
-        balances[addr] = {
-          balance: (balances[addr]?.balance || 0) + unspent.amount,
-          transactions: (balances[addr]?.transactions || 0) + 1,
-        };
-      }
+    if (!result || !result.success) {
+      throw new Error(`scantxoutset failed: ${JSON.stringify(result)}`);
+    }
+
+    for (const unspent of result.unspents) {
+      const addr = unspent.desc.match(/addr\((.*?)\)/)[1];
+      balances[addr] = {
+        balance: (balances[addr]?.balance || 0) + unspent.amount,
+        transactions: (balances[addr]?.transactions || 0) + 1,
+      };
     }
 
     // Заполняем пустые балансы
