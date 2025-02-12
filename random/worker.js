@@ -35,19 +35,17 @@ function generatePrivateKey() {
 // Создание биткоин-адресов 4 типов
 function generateBitcoinAddresses(privateKeyHex) {
   const keyPair = ECPair.fromPrivateKey(Buffer.from(privateKeyHex, "hex"));
-  const { publicKey } = keyPair;
-  const network = bitcoin.networks.bitcoin;
+  const publicKey = Buffer.from(keyPair.publicKey); // 🔹 Исправлено!
 
-  return [
-    bitcoin.payments.p2pkh({ pubkey: publicKey, network }).address, // P2PKH
-    bitcoin.payments.p2sh({
-      redeem: bitcoin.payments.p2wpkh({ pubkey: publicKey, network }),
-      network,
-    }).address, // P2SH
-    bitcoin.payments.p2wpkh({ pubkey: publicKey, network }).address, // P2WPKH
-    bitcoin.payments.p2tr({ internalPubkey: publicKey.slice(1, 33), network })
-      .address, // P2TR
-  ];
+  return {
+    p2pkh: bitcoin.payments.p2pkh({ pubkey: publicKey }).address,
+    p2sh: bitcoin.payments.p2sh({
+      redeem: bitcoin.payments.p2wpkh({ pubkey: publicKey }),
+    }).address,
+    p2wpkh: bitcoin.payments.p2wpkh({ pubkey: publicKey }).address,
+    p2tr: bitcoin.payments.p2tr({ internalPubkey: publicKey.slice(1, 33) })
+      .address,
+  };
 }
 
 // Функция поиска в базе с повтором при блокировке
