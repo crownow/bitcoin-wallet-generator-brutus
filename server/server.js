@@ -63,11 +63,15 @@ async function processFile(filePath, socketId) {
         const balance = await getWalletBalance(walletData.addresses);
         walletData.balance = balance;
 
-        if (
-          Object.values(balance).some(
-            (b) => b.balance > 0 || b.transactions > 0
-          )
-        ) {
+        if (!balance || typeof balance !== "object") return;
+        const hasFunds = Object.values(balance).some(
+          (b) => (b?.balance ?? 0) > 0 || (b?.transactions ?? 0) > 0
+        );
+        if (hasFunds) {
+          walletFoundCount++;
+          if (socket) socket.emit("walletFound", walletData);
+        }
+        {
           walletFoundCount++;
           if (socket) {
             socket.emit("walletFound", walletData);

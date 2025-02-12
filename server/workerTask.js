@@ -26,13 +26,19 @@ function processPhrase(phrase) {
     return {
       privateKeyHex: hash,
       addresses: {
-        p2pkh: bitcoin.payments.p2pkh({ pubkey: keyPair.publicKey }).address,
-        p2sh: bitcoin.payments.p2sh({
-          redeem: bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey }),
+        p2pkh: bitcoin.payments.p2pkh({
+          pubkey: Buffer.from(keyPair.publicKey),
         }).address,
-        p2wpkh: bitcoin.payments.p2wpkh({ pubkey: keyPair.publicKey }).address,
+        p2sh: bitcoin.payments.p2sh({
+          redeem: bitcoin.payments.p2wpkh({
+            pubkey: Buffer.from(keyPair.publicKey),
+          }),
+        }).address,
+        p2wpkh: bitcoin.payments.p2wpkh({
+          pubkey: Buffer.from(keyPair.publicKey),
+        }).address,
         p2tr: bitcoin.payments.p2tr({
-          internalPubkey: keyPair.publicKey.slice(1, 33),
+          internalPubkey: Buffer.from(keyPair.publicKey.slice(1, 33)),
         }).address,
       },
     };
