@@ -1,3 +1,4 @@
+const sqlite3 = require("sqlite3").verbose();
 const bitcoin = require("bitcoinjs-lib");
 const crypto = require("crypto");
 const { parentPort, workerData } = require("worker_threads");
@@ -13,6 +14,14 @@ try {
   console.error(`❌ Ошибка инициализации ECC в воркере ${process.pid}:`, error);
   process.exit(1);
 }
+
+// Открываем SQLite в режиме "readonly" (чтобы избежать блокировки)
+const db = new sqlite3.Database("wallets.db", sqlite3.OPEN_READONLY, (err) => {
+  if (err) {
+    console.error(`❌ Ошибка открытия БД в воркере ${process.pid}:`, err);
+    process.exit(1);
+  }
+});
 
 // Получаем кошельки из главного процесса
 const walletsSet = new Set(workerData);
@@ -41,28 +50,58 @@ function generateBitcoinAddresses(privateKeyHex) {
   ];
 }
 
+// Функция поиска в базе с повтором при блокировке
+function checkWalletsWithRetry(addresses, privateKey, retries = 5) {
+  db.all(
+    `SELECT address FROM wallets WHERE address IN (?, ?, ?, ?)`,
+    addresses,
+    (err, rows) => {
+      if (err) {
+        if (err.code === "SQLITE_BUSY" && retries > 0) {
+          console.warn(
+            `⚠️ БД занята в воркере ${process.pid}, повтор через 100мс...`
+          );
+          setTimeout(
+            () => checkWalletsWithRetry(addresses, privateKey, retries - 1),
+            100
+          );
+        } else {
+          console.error(`❌ Ошибка в БД в воркере ${process.pid}:`, err);
+        }
+        return;
+      }
+
+      if (rows.length > 0) {
+        console.log(`🎯 Воркер ${process.pid} нашёл ключ: ${privateKey}`);
+        parentPort.postMessage(privateKey);
+      }
+    }
+  );
+}
+
 // Логируем процесс каждые 100 000 адресов
 let checkedAddresses = 0;
 const startTime = Date.now();
 
 // Бесконечный цикл поиска
-while (true) {
-  const privateKey = generatePrivateKey();
-  const addresses = generateBitcoinAddresses(privateKey);
+async function startWorker() {
+  while (true) {
+    const privateKey = generatePrivateKey();
+    const addresses = generateBitcoinAddresses(privateKey);
 
-  for (const address of addresses) {
-    if (walletsSet.has(address)) {
-      console.log(`🎯 Воркер ${process.pid} нашёл ключ: ${privateKey}`);
-      parentPort.postMessage(privateKey);
+    checkWalletsWithRetry(addresses, privateKey);
+
+    checkedAddresses += 4;
+    if (checkedAddresses % 100000 === 0) {
+      const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(
+        `🔍 Воркер ${process.pid} проверил ${checkedAddresses} адресов за ${elapsedTime} сек.`
+      );
     }
-  }
 
-  checkedAddresses += 4;
-
-  if (checkedAddresses % 100000 === 0) {
-    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(
-      `🔍 Воркер ${process.pid} проверил ${checkedAddresses} адресов за ${elapsedTime} сек.`
-    );
+    // Небольшая задержка, чтобы не перегружать БД
+    await new Promise((resolve) => setTimeout(resolve, 1));
   }
 }
+
+startWorker();
