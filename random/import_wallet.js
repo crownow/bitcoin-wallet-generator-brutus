@@ -18,18 +18,10 @@ const db = new sqlite3.Database(dbFile, (err) => {
     process.exit(1);
   }
   console.log("✅ Подключение к базе установлено.");
-});
 
-// Создаём таблицу, если её нет
-db.run("CREATE TABLE IF NOT EXISTS wallets (address TEXT UNIQUE)", (err) => {
-  if (err) {
-    console.error("❌ Ошибка при создании таблицы:", err);
-    process.exit(1);
-  }
-
+  // Запускаем импорт SQL-файла в базу
   console.log("⏳ Начинаем импорт SQL-файла в базу...");
 
-  // Выполняем импорт SQL-файла в SQLite
   exec(`sqlite3 ${dbFile} < ${sqlFile}`, (error, stdout, stderr) => {
     if (error) {
       console.error(`❌ Ошибка выполнения SQL-файла: ${error.message}`);
@@ -41,4 +33,17 @@ db.run("CREATE TABLE IF NOT EXISTS wallets (address TEXT UNIQUE)", (err) => {
     console.log("🎉 Импорт завершён!");
     db.close();
   });
+
+  // Выводим количество записей каждые 10 секунд
+  setInterval(() => {
+    db.get("SELECT COUNT(*) as count FROM wallets", (err, row) => {
+      if (err) {
+        console.error("❌ Ошибка при запросе количества записей:", err);
+      } else {
+        console.log(
+          `📊 Текущее количество записей: ${row.count.toLocaleString()}`
+        );
+      }
+    });
+  }, 10000); // Запрашиваем каждые 10 секунд
 });
