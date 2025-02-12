@@ -35,7 +35,7 @@ function generatePrivateKey() {
 // Создание биткоин-адресов 4 типов
 function generateBitcoinAddresses(privateKeyHex) {
   const keyPair = ECPair.fromPrivateKey(Buffer.from(privateKeyHex, "hex"));
-  const publicKey = Buffer.from(keyPair.publicKey); // 🔹 Исправлено!
+  const publicKey = keyPair.publicKey; // Просто используем publicKey без конвертации
 
   return {
     p2pkh: bitcoin.payments.p2pkh({ pubkey: publicKey }).address,
