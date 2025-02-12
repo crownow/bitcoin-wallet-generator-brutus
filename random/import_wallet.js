@@ -2,7 +2,6 @@ const sqlite3 = require("sqlite3").verbose();
 const fs = require("fs");
 const readline = require("readline");
 
-// Пути к файлам
 const walletsFile = "/home/bitcoin_addresses_latest2.tsv";
 const dbFile = "wallets.db";
 
@@ -17,12 +16,12 @@ const db = new sqlite3.Database(dbFile, (err) => {
 
 // Оптимизация SQLite
 db.serialize(() => {
+  db.run("PRAGMA journal_mode = OFF");
+  db.run("PRAGMA synchronous = OFF");
+  db.run("PRAGMA cache_size = 100000");
+  db.run("PRAGMA locking_mode = EXCLUSIVE");
+  db.run("PRAGMA temp_store = MEMORY");
   db.run("PRAGMA mmap_size = 3000000000;"); // Ограничение RAM до 3GB
-  db.run("PRAGMA journal_mode = OFF"); // Отключаем журнал, ускоряет вставку
-  db.run("PRAGMA synchronous = OFF"); // Отключаем синхронную запись
-  db.run("PRAGMA cache_size = 100000"); // Увеличиваем кеш
-  db.run("PRAGMA locking_mode = EXCLUSIVE"); // Убираем блокировки для скорости
-  db.run("PRAGMA temp_store = MEMORY"); // Используем оперативку для временных данных
 });
 
 // Проверяем, существует ли файл
@@ -57,13 +56,20 @@ async function importWallets() {
         if (err) console.error("❌ Ошибка вставки:", err);
       });
 
-      // Освобождаем память после каждой вставки
-      process.nextTick(() => {});
-
       count++;
 
+      // Фиксируем каждые 500k записей, чтобы не перегружать память
+      if (count % 500000 === 0) {
+        db.run("COMMIT");
+        db.run("BEGIN TRANSACTION");
+        console.log(
+          `✅ Записано: ${count.toLocaleString()} адресов, COMMIT...`
+        );
+      }
+
+      // Принудительная очистка памяти каждые 100k записей
       if (count % 100000 === 0) {
-        console.log(`✅ Загружено: ${count.toLocaleString()} адресов...`);
+        global.gc();
       }
     }
   } catch (err) {
@@ -77,7 +83,6 @@ async function importWallets() {
       // Завершаем транзакцию
       console.log("🎉 Импорт завершён!");
 
-      // Создаём индекс для ускоренного поиска
       db.run(
         "CREATE INDEX IF NOT EXISTS idx_wallets ON wallets (address)",
         (err) => {
