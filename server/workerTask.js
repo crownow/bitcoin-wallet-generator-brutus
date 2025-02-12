@@ -21,7 +21,6 @@ function processPhrase(phrase) {
   try {
     const hash = bitcoin.crypto.sha256(Buffer.from(phrase)).toString("hex");
     const privateKeyBuffer = Buffer.from(hash, "hex");
-
     const keyPair = ECPair.fromPrivateKey(privateKeyBuffer);
 
     return {

@@ -2,15 +2,12 @@ require("dotenv").config();
 const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
-const path = require("path");
 const readline = require("readline");
 const http = require("http");
 const { Server } = require("socket.io");
-const pLimit = require("p-limit");
-const os = require("os");
+const workerpool = require("workerpool");
 
 const { getWalletBalance } = require("./api");
-const { processPhrase } = require("./wallet");
 
 const app = express();
 app.use(express.json());
@@ -19,6 +16,9 @@ app.use(express.urlencoded({ extended: true }));
 const upload = multer({ dest: "uploads/" });
 const server = http.createServer(app);
 const io = new Server(server);
+const pool = workerpool.pool(__dirname + "/workerTasks.js", {
+  minWorkers: "max",
+});
 
 io.on("connection", (socket) => {
   console.log("✅ Client connected:", socket.id);
@@ -41,7 +41,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 });
 
 async function processFile(filePath, socketId) {
-  const limit = pLimit(50);
   const fileStream = fs.createReadStream(filePath, { encoding: "utf8" });
   const rl = readline.createInterface({
     input: fileStream,
@@ -50,7 +49,6 @@ async function processFile(filePath, socketId) {
 
   let processedCount = 0;
   let walletFoundCount = 0;
-
   const socket = io.sockets.sockets.get(socketId);
   if (!socket) console.warn("⚠️ Socket not found for ID:", socketId);
 
@@ -59,9 +57,9 @@ async function processFile(filePath, socketId) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    const task = limit(async () => {
-      try {
-        const walletData = processPhrase(trimmed);
+    const task = pool
+      .exec("processPhrase", [trimmed])
+      .then(async (walletData) => {
         const balance = await getWalletBalance(walletData.addresses);
         walletData.balance = balance;
 
@@ -80,15 +78,15 @@ async function processFile(filePath, socketId) {
         if (processedCount % 1000 === 0 && socket) {
           socket.emit("progress", { processed: processedCount });
         }
-      } catch (error) {
-        console.error("❌ Error processing line:", error);
-      }
-    });
+      })
+      .catch((error) => console.error("❌ Worker error:", error));
 
     tasks.push(task);
   }
 
   await Promise.all(tasks);
+  pool.terminate(); // Закрываем worker pool после обработки всех данных
+
   if (socket) {
     socket.emit("complete", {
       totalProcessed: processedCount,
