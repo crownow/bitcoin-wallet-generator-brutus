@@ -4,6 +4,7 @@ const readline = require("readline");
 
 const walletsFile = "/home/bitcoin_addresses_latest2.tsv";
 const dbFile = "wallets.db";
+const BATCH_SIZE = 1_000_000; // Размер порции (1 миллион записей)
 
 // Открываем SQLite базу
 const db = new sqlite3.Database(dbFile, (err) => {
@@ -14,15 +15,8 @@ const db = new sqlite3.Database(dbFile, (err) => {
   console.log("✅ Подключение к базе установлено.");
 });
 
-// Оптимизация SQLite (ОГРАНИЧИВАЕМ RAM!)
-db.serialize(() => {
-  db.run("PRAGMA journal_mode = OFF");
-  db.run("PRAGMA synchronous = OFF");
-  db.run("PRAGMA cache_size = -1000000;"); // Ограничиваем кеш SQLite (1GB)
-  db.run("PRAGMA mmap_size = 1073741824;"); // Ограничиваем использование памяти SQLite (1GB)
-  db.run("PRAGMA temp_store = MEMORY;");
-  db.run("PRAGMA locking_mode = EXCLUSIVE;");
-});
+// Создаём таблицу, если её нет
+db.run("CREATE TABLE IF NOT EXISTS wallets (address TEXT UNIQUE)");
 
 // Проверяем, существует ли файл
 if (!fs.existsSync(walletsFile)) {
@@ -32,7 +26,7 @@ if (!fs.existsSync(walletsFile)) {
 
 // Функция импорта кошельков
 async function importWallets() {
-  console.log("⏳ Импортируем кошельки в SQLite...");
+  console.log("⏳ Начинаем импорт кошельков в SQLite...");
 
   const fileStream = fs.createReadStream(walletsFile);
   const rl = readline.createInterface({
@@ -40,58 +34,59 @@ async function importWallets() {
     crlfDelay: Infinity,
   });
 
+  let batch = [];
   let count = 0;
-  db.run("BEGIN TRANSACTION"); // Начинаем транзакцию
-
-  const insertStmt = db.prepare(
-    "INSERT OR IGNORE INTO wallets (address) VALUES (?)"
-  );
 
   try {
     for await (const line of rl) {
       const address = line.trim();
       if (!address) continue;
 
-      insertStmt.run(address, (err) => {
-        if (err) console.error("❌ Ошибка вставки:", err);
-      });
-
+      batch.push(address);
       count++;
 
-      // Фиксируем каждые 50,000 записей
-      if (count % 50000 === 0) {
-        db.run("COMMIT", () => {
-          db.run("BEGIN TRANSACTION");
-          console.log(
-            `✅ Записано: ${count.toLocaleString()} адресов, COMMIT...`
-          );
-        });
-      }
-
-      // Принудительная очистка памяти каждые 25,000 записей
-      if (count % 25000 === 0 && global.gc) {
-        global.gc();
+      // Когда набрался 1 миллион записей – записываем их в базу
+      if (batch.length >= BATCH_SIZE) {
+        await insertBatch(batch);
+        console.log(`✅ Загружено: ${count.toLocaleString()} адресов`);
+        batch = []; // Очищаем буфер
       }
     }
+
+    // Вставляем оставшиеся записи, если они есть
+    if (batch.length > 0) {
+      await insertBatch(batch);
+    }
+
+    console.log("🎉 Импорт завершён!");
   } catch (err) {
     console.error("❌ Ошибка при чтении файла:", err);
+  } finally {
+    db.close();
   }
+}
 
-  insertStmt.finalize((err) => {
-    if (err) console.error("❌ Ошибка при закрытии prepared statement:", err);
-
-    db.run("COMMIT", () => {
-      // Завершаем транзакцию
-      console.log("🎉 Импорт завершён!");
-
-      db.run(
-        "CREATE INDEX IF NOT EXISTS idx_wallets ON wallets (address)",
-        (err) => {
-          if (err) console.error("❌ Ошибка при создании индекса:", err);
-          else console.log("🚀 Индекс создан! Теперь поиск будет мгновенным.");
-          db.close();
-        }
+// Функция для массовой вставки данных
+function insertBatch(batch) {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+      const stmt = db.prepare(
+        "INSERT OR IGNORE INTO wallets (address) VALUES (?)"
       );
+
+      for (const address of batch) {
+        stmt.run(address);
+      }
+
+      stmt.finalize((err) => {
+        if (err) {
+          console.error("❌ Ошибка вставки данных:", err);
+          reject(err);
+        } else {
+          db.run("COMMIT", resolve);
+        }
+      });
     });
   });
 }
