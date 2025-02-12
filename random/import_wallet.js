@@ -2,11 +2,9 @@ const sqlite3 = require("sqlite3").verbose();
 const fs = require("fs");
 const readline = require("readline");
 
-// Пути к файлам
 const walletsFile = "/home/bitcoin_addresses_latest2.tsv";
 const dbFile = "wallets.db";
 
-// Открываем базу данных
 const db = new sqlite3.Database(dbFile, (err) => {
   if (err) {
     console.error("❌ Ошибка подключения к базе:", err);
@@ -15,28 +13,19 @@ const db = new sqlite3.Database(dbFile, (err) => {
   console.log("✅ Подключение к базе установлено.");
 });
 
-// Создаём таблицу (если её нет)
 db.serialize(() => {
-  console.log("📌 Пересоздаём таблицу wallets...");
-  db.run("DROP TABLE IF EXISTS wallets", (err) => {
-    if (err) console.error("❌ Ошибка при удалении таблицы:", err);
-  });
-
-  db.run("CREATE TABLE wallets (address TEXT PRIMARY KEY)", (err) => {
-    if (err) console.error("❌ Ошибка при создании таблицы:", err);
-  });
-
-  db.run("PRAGMA synchronous = OFF");
   db.run("PRAGMA journal_mode = MEMORY");
+  db.run("PRAGMA synchronous = OFF");
+  db.run("PRAGMA cache_size = 100000");
+  db.run("PRAGMA max_page_count = 2147483646");
 });
 
-// Проверяем, существует ли файл
+// Проверяем, есть ли файл
 if (!fs.existsSync(walletsFile)) {
   console.error(`❌ Файл ${walletsFile} не найден!`);
   process.exit(1);
 }
 
-// Функция для импорта данных
 async function importWallets() {
   console.log("⏳ Импортируем кошельки в SQLite...");
 
@@ -51,23 +40,23 @@ async function importWallets() {
     "INSERT OR IGNORE INTO wallets (address) VALUES (?)"
   );
 
-  for await (const line of rl) {
-    const address = line.trim();
+  try {
+    for await (const line of rl) {
+      const address = line.trim();
+      if (!address) continue;
 
-    if (!address) {
-      console.warn("⚠️ Пустая строка, пропускаем...");
-      continue;
+      insertStmt.run(address, (err) => {
+        if (err) console.error("❌ Ошибка вставки:", err);
+      });
+
+      count++;
+
+      if (count % 100000 === 0) {
+        console.log(`✅ Загружено: ${count.toLocaleString()} адресов...`);
+      }
     }
-
-    insertStmt.run(address, (err) => {
-      if (err) console.error("❌ Ошибка вставки:", err);
-    });
-
-    count++;
-
-    if (count % 100000 === 0) {
-      console.log(`✅ Загружено: ${count.toLocaleString()} адресов...`);
-    }
+  } catch (err) {
+    console.error("❌ Ошибка при чтении файла:", err);
   }
 
   insertStmt.finalize((err) => {
@@ -82,5 +71,4 @@ async function importWallets() {
   });
 }
 
-// Запускаем импорт
 importWallets();
