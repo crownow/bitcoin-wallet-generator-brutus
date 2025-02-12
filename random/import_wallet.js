@@ -18,10 +18,9 @@ const db = new sqlite3.Database(dbFile, (err) => {
 db.serialize(() => {
   db.run("PRAGMA journal_mode = OFF");
   db.run("PRAGMA synchronous = OFF");
-  db.run("PRAGMA cache_size = 100000");
-  db.run("PRAGMA locking_mode = EXCLUSIVE");
-  db.run("PRAGMA temp_store = MEMORY");
-  db.run("PRAGMA mmap_size = 3000000000;"); // Ограничение RAM до 3GB
+  db.run("PRAGMA cache_size = -2000000;"); // Ограничиваем кеш SQLite (2GB)
+  db.run("PRAGMA mmap_size = 2147483648;"); // Ограничиваем использование памяти SQLite (2GB)
+  db.run("PRAGMA temp_store = MEMORY;");
 });
 
 // Проверяем, существует ли файл
@@ -58,23 +57,18 @@ async function importWallets() {
 
       count++;
 
-      if (count % 500000 === 0) {
-        db.run("COMMIT", (err) => {
-          if (err) {
-            console.error("❌ Ошибка при COMMIT:", err);
-          } else {
-            db.run("BEGIN TRANSACTION", (err) => {
-              if (err) console.error("❌ Ошибка при начале транзакции:", err);
-            });
-            console.log(
-              `✅ Записано: ${count.toLocaleString()} адресов, COMMIT...`
-            );
-          }
+      // Фиксируем каждые 100,000 записей
+      if (count % 100000 === 0) {
+        db.run("COMMIT", () => {
+          db.run("BEGIN TRANSACTION");
+          console.log(
+            `✅ Записано: ${count.toLocaleString()} адресов, COMMIT...`
+          );
         });
       }
 
-      // Принудительная очистка памяти каждые 100k записей
-      if (count % 100000 === 0) {
+      // Принудительная очистка памяти каждые 50,000 записей
+      if (count % 50000 === 0 && global.gc) {
         global.gc();
       }
     }
