@@ -14,13 +14,14 @@ const db = new sqlite3.Database(dbFile, (err) => {
   console.log("✅ Подключение к базе установлено.");
 });
 
-// Оптимизация SQLite
+// Оптимизация SQLite (ОГРАНИЧИВАЕМ RAM!)
 db.serialize(() => {
   db.run("PRAGMA journal_mode = OFF");
   db.run("PRAGMA synchronous = OFF");
-  db.run("PRAGMA cache_size = -2000000;"); // Ограничиваем кеш SQLite (2GB)
-  db.run("PRAGMA mmap_size = 2147483648;"); // Ограничиваем использование памяти SQLite (2GB)
+  db.run("PRAGMA cache_size = -1000000;"); // Ограничиваем кеш SQLite (1GB)
+  db.run("PRAGMA mmap_size = 1073741824;"); // Ограничиваем использование памяти SQLite (1GB)
   db.run("PRAGMA temp_store = MEMORY;");
+  db.run("PRAGMA locking_mode = EXCLUSIVE;");
 });
 
 // Проверяем, существует ли файл
@@ -57,8 +58,8 @@ async function importWallets() {
 
       count++;
 
-      // Фиксируем каждые 100,000 записей
-      if (count % 100000 === 0) {
+      // Фиксируем каждые 50,000 записей
+      if (count % 50000 === 0) {
         db.run("COMMIT", () => {
           db.run("BEGIN TRANSACTION");
           console.log(
@@ -67,8 +68,8 @@ async function importWallets() {
         });
       }
 
-      // Принудительная очистка памяти каждые 50,000 записей
-      if (count % 50000 === 0 && global.gc) {
+      // Принудительная очистка памяти каждые 25,000 записей
+      if (count % 25000 === 0 && global.gc) {
         global.gc();
       }
     }
