@@ -5,7 +5,6 @@ const { spawn } = require("child_process");
 const dbFile = "wallets.db";
 const sqlFile = "/root/wallets.sql"; // Убедись, что путь правильный!
 
-// Проверяем, существует ли файл SQL
 if (!fs.existsSync(sqlFile)) {
   console.error(`❌ Файл ${sqlFile} не найден!`);
   process.exit(1);
@@ -21,25 +20,39 @@ const db = new sqlite3.Database(dbFile, (err) => {
 
   console.log("⏳ Начинаем импорт SQL-файла в базу...");
 
-  // Используем spawn вместо exec, чтобы не переполнялся буфер памяти
-  const sqliteProcess = spawn("sqlite3", [dbFile]);
+  function runImport(attempt = 1) {
+    const sqliteProcess = spawn("sqlite3", [dbFile]);
 
-  // Читаем SQL-файл построчно и передаем в stdin SQLite
-  const sqlStream = fs.createReadStream(sqlFile);
-  sqlStream.pipe(sqliteProcess.stdin);
+    // Читаем SQL-файл построчно и передаем в stdin SQLite
+    const sqlStream = fs.createReadStream(sqlFile);
+    sqlStream.pipe(sqliteProcess.stdin);
 
-  sqliteProcess.on("close", (code) => {
-    if (code === 0) {
-      console.log("🎉 Импорт завершён!");
-    } else {
-      console.error(`❌ Ошибка импорта. Код выхода: ${code}`);
-    }
-    db.close();
-  });
+    sqliteProcess.on("close", (code) => {
+      if (code === 0) {
+        console.log("🎉 Импорт завершён!");
+        db.close();
+      } else {
+        console.error(`❌ Ошибка импорта. Код выхода: ${code}`);
+        if (attempt < 5) {
+          console.log(`🔄 Попытка ${attempt + 1} через 5 секунд...`);
+          setTimeout(() => runImport(attempt + 1), 5000);
+        } else {
+          console.log("❌ Не удалось импортировать данные после 5 попыток.");
+        }
+      }
+    });
 
-  sqliteProcess.stderr.on("data", (data) => {
-    console.error(`❌ Ошибка SQL: ${data}`);
-  });
+    sqliteProcess.stderr.on("data", (data) => {
+      if (data.includes("database is locked")) {
+        console.log("⚠️ База данных заблокирована. Ждем...");
+        setTimeout(() => runImport(attempt + 1), 5000);
+      } else {
+        console.error(`❌ Ошибка SQL: ${data}`);
+      }
+    });
+  }
+
+  runImport();
 
   // Выводим количество записей каждые 10 секунд
   setInterval(() => {
@@ -52,5 +65,5 @@ const db = new sqlite3.Database(dbFile, (err) => {
         );
       }
     });
-  }, 10000); // Обновление каждые 10 сек.
+  }, 10000);
 });
