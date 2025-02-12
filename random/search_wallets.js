@@ -1,11 +1,24 @@
 const sqlite3 = require("sqlite3").verbose();
 const bitcoin = require("bitcoinjs-lib");
-const ecc = require("tiny-secp256k1"); // Необходим для работы ECPair
+const ecc = require("tiny-secp256k1"); // Библиотека ECC
+const wif = require("wif");
 const crypto = require("crypto");
 const fs = require("fs");
 
 const ECPairFactory = require("ecpair").default;
-const ECPair = ECPairFactory(ecc); // Используем ECPair через tiny-secp256k1
+const ECPair = ECPairFactory(ecc); // Создаём ECPair
+
+// Проверка библиотеки ECC
+try {
+  if (!ecc || !ecc.isPoint) {
+    throw new Error("tiny-secp256k1 is not working properly");
+  }
+  bitcoin.initEccLib(ecc);
+  console.log("✅ ECC library initialized successfully!");
+} catch (error) {
+  console.error("❌ ECC library failed to initialize:", error);
+  process.exit(1);
+}
 
 // Открываем базу
 const db = new sqlite3.Database("wallets.db");
@@ -18,29 +31,50 @@ function generatePrivateKey() {
   return crypto.randomBytes(32).toString("hex");
 }
 
-// Создание биткоин-адресов 4 типов
-function generateBitcoinAddresses(privateKeyHex) {
-  const keyPair = ECPair.fromPrivateKey(Buffer.from(privateKeyHex, "hex"));
-  const { publicKey } = keyPair;
-  const network = bitcoin.networks.bitcoin;
+// Генерация WIF-формата ключа
+function generateWIF(privateKeyHex) {
+  return wif.encode(128, Buffer.from(privateKeyHex, "hex"), true);
+}
 
-  return [
-    bitcoin.payments.p2pkh({ pubkey: publicKey, network }).address, // P2PKH
-    bitcoin.payments.p2sh({
-      redeem: bitcoin.payments.p2wpkh({ pubkey: publicKey, network }),
-      network,
-    }).address, // P2SH
-    bitcoin.payments.p2wpkh({ pubkey: publicKey, network }).address, // P2WPKH
-    bitcoin.payments.p2tr({ internalPubkey: publicKey.slice(1, 33), network })
-      .address, // P2TR
-  ];
+// Генерация публичного ключа (сжатый и несжатый формат)
+function generatePublicKey(privateKeyHex) {
+  const keyPair = ECPair.fromPrivateKey(Buffer.from(privateKeyHex, "hex"));
+
+  // Преобразуем Uint8Array в Buffer
+  const compressed = Buffer.from(keyPair.publicKey);
+  const uncompressed = Buffer.concat([
+    Buffer.from([0x04]),
+    keyPair.publicKey.slice(1, 33),
+    keyPair.publicKey.slice(33, 65),
+  ]);
+
+  return { compressed, uncompressed };
+}
+
+// Создание биткоин-адресов 4 типов
+function generateBitcoinAddresses(publicKey) {
+  return {
+    p2pkh: bitcoin.payments.p2pkh({ pubkey: Buffer.from(publicKey.compressed) })
+      .address,
+    p2sh: bitcoin.payments.p2sh({
+      redeem: bitcoin.payments.p2wpkh({
+        pubkey: Buffer.from(publicKey.compressed),
+      }),
+    }).address,
+    p2wpkh: bitcoin.payments.p2wpkh({
+      pubkey: Buffer.from(publicKey.compressed),
+    }).address,
+    p2tr: bitcoin.payments.p2tr({
+      internalPubkey: Buffer.from(publicKey.compressed.slice(1, 33)),
+    }).address,
+  };
 }
 
 // Функция для поиска адресов в базе
 function checkWallets(addresses, privateKey) {
   db.all(
     `SELECT address FROM wallets WHERE address IN (?, ?, ?, ?)`,
-    addresses,
+    Object.values(addresses),
     (err, rows) => {
       if (err) {
         console.error("❌ Ошибка поиска в базе:", err);
@@ -55,16 +89,17 @@ function checkWallets(addresses, privateKey) {
   );
 }
 
-// Основной бесконечный цикл
+// Основной бесконечный цикл поиска
 function startSearching() {
   console.log("🚀 Начинаем поиск...");
 
   setInterval(() => {
-    const privateKey = generatePrivateKey();
-    const addresses = generateBitcoinAddresses(privateKey);
-    checkWallets(addresses, privateKey);
-  }, 1); // Каждую миллисекунду генерируем новый ключ
+    const privateKeyHex = generatePrivateKey();
+    const publicKey = generatePublicKey(privateKeyHex);
+    const addresses = generateBitcoinAddresses(publicKey);
+    checkWallets(addresses, privateKeyHex);
+  }, 1); // Генерация нового ключа каждую миллисекунду
 }
 
-// Запуск
+// Запуск поиска
 startSearching();
