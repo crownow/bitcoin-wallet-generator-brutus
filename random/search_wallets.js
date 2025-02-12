@@ -28,7 +28,7 @@ if (isMainThread) {
     // Запускаем воркеров
     for (let i = 0; i < numWorkers; i++) {
       const worker = new Worker(__dirname + "/worker.js", {
-        workerData: Array.from(walletsSet), // Передаём список адресов воркеру
+        workerData: Array.from(walletsSet), // ✅ Исправлено (массив для передачи)
       });
 
       console.log(`🔹 Воркер ${worker.threadId} запущен.`);

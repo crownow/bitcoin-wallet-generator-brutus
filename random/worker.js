@@ -15,7 +15,7 @@ try {
   process.exit(1);
 }
 
-// Открываем SQLite в режиме "readonly" (чтобы избежать блокировки)
+// Открываем SQLite в режиме "readonly"
 const db = new sqlite3.Database("wallets.db", sqlite3.OPEN_READONLY, (err) => {
   if (err) {
     console.error(`❌ Ошибка открытия БД в воркере ${process.pid}:`, err);
@@ -27,7 +27,7 @@ const db = new sqlite3.Database("wallets.db", sqlite3.OPEN_READONLY, (err) => {
 const walletsSet = new Set(workerData);
 console.log(`🔹 Воркер ${process.pid} получил ${walletsSet.size} адресов.`);
 
-// Генерация случайного приватного ключа (SHA-256 HEX)
+// Генерация случайного приватного ключа
 function generatePrivateKey() {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -35,7 +35,7 @@ function generatePrivateKey() {
 // Создание биткоин-адресов 4 типов
 function generateBitcoinAddresses(privateKeyHex) {
   const keyPair = ECPair.fromPrivateKey(Buffer.from(privateKeyHex, "hex"));
-  const publicKey = keyPair.publicKey; // Просто используем publicKey без конвертации
+  const publicKey = Buffer.from(keyPair.publicKey); // ✅ Исправлено
 
   return {
     p2pkh: bitcoin.payments.p2pkh({ pubkey: publicKey }).address,
@@ -52,7 +52,7 @@ function generateBitcoinAddresses(privateKeyHex) {
 function checkWalletsWithRetry(addresses, privateKey, retries = 5) {
   db.all(
     `SELECT address FROM wallets WHERE address IN (?, ?, ?, ?)`,
-    addresses,
+    [addresses.p2pkh, addresses.p2sh, addresses.p2wpkh, addresses.p2tr], // ✅ Исправлено
     (err, rows) => {
       if (err) {
         if (err.code === "SQLITE_BUSY" && retries > 0) {
