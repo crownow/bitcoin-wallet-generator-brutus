@@ -16,7 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 const upload = multer({ dest: "uploads/" });
 const server = http.createServer(app);
 const io = new Server(server);
-const pool = workerpool.pool(__dirname + "/workerTasks.js", {
+const pool = workerpool.pool(__dirname + "/workerTask.js", {
   minWorkers: "max",
 });
 
