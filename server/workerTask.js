@@ -3,7 +3,6 @@ const bitcoin = require("bitcoinjs-lib");
 const ECPairFactory = require("ecpair").default;
 const tinysecp = require("tiny-secp256k1");
 
-// ✅ Проверяем, загружена ли библиотека
 try {
   if (!tinysecp || !tinysecp.isPoint) {
     throw new Error("tiny-secp256k1 is not working properly in worker");
@@ -18,13 +17,11 @@ try {
 
 const ECPair = ECPairFactory(tinysecp);
 
-// Функция для обработки фразы
 function processPhrase(phrase) {
   try {
     const hash = bitcoin.crypto.sha256(Buffer.from(phrase)).toString("hex");
     const privateKeyBuffer = Buffer.from(hash, "hex");
 
-    // Генерируем ключи
     const keyPair = ECPair.fromPrivateKey(privateKeyBuffer);
 
     return {
