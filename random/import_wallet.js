@@ -58,13 +58,19 @@ async function importWallets() {
 
       count++;
 
-      // Фиксируем каждые 500k записей, чтобы не перегружать память
       if (count % 500000 === 0) {
-        db.run("COMMIT");
-        db.run("BEGIN TRANSACTION");
-        console.log(
-          `✅ Записано: ${count.toLocaleString()} адресов, COMMIT...`
-        );
+        db.run("COMMIT", (err) => {
+          if (err) {
+            console.error("❌ Ошибка при COMMIT:", err);
+          } else {
+            db.run("BEGIN TRANSACTION", (err) => {
+              if (err) console.error("❌ Ошибка при начале транзакции:", err);
+            });
+            console.log(
+              `✅ Записано: ${count.toLocaleString()} адресов, COMMIT...`
+            );
+          }
+        });
       }
 
       // Принудительная очистка памяти каждые 100k записей
