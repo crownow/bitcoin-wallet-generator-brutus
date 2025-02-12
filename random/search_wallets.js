@@ -1,7 +1,11 @@
 const sqlite3 = require("sqlite3").verbose();
 const bitcoin = require("bitcoinjs-lib");
+const ecc = require("tiny-secp256k1"); // Необходим для работы ECPair
 const crypto = require("crypto");
 const fs = require("fs");
+
+const ECPairFactory = require("ecpair").default;
+const ECPair = ECPairFactory(ecc); // Используем ECPair через tiny-secp256k1
 
 // Открываем базу
 const db = new sqlite3.Database("wallets.db");
@@ -16,9 +20,7 @@ function generatePrivateKey() {
 
 // Создание биткоин-адресов 4 типов
 function generateBitcoinAddresses(privateKeyHex) {
-  const keyPair = bitcoin.ECPair.fromPrivateKey(
-    Buffer.from(privateKeyHex, "hex")
-  );
+  const keyPair = ECPair.fromPrivateKey(Buffer.from(privateKeyHex, "hex"));
   const { publicKey } = keyPair;
   const network = bitcoin.networks.bitcoin;
 
