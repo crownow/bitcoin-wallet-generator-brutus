@@ -17,6 +17,7 @@ const db = new sqlite3.Database(dbFile, (err) => {
 
 // Оптимизация SQLite
 db.serialize(() => {
+  db.run("PRAGMA mmap_size = 3000000000;"); // Ограничение RAM до 3GB
   db.run("PRAGMA journal_mode = OFF"); // Отключаем журнал, ускоряет вставку
   db.run("PRAGMA synchronous = OFF"); // Отключаем синхронную запись
   db.run("PRAGMA cache_size = 100000"); // Увеличиваем кеш
