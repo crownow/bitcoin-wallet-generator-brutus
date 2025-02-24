@@ -7,7 +7,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const workerpool = require("workerpool");
 
-const { getWalletBalance } = require("./api");
+const { getWalletBalance } = require("./bitcoinClient");
 
 const app = express();
 app.use(express.json());

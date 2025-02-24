@@ -7,3 +7,7 @@ dist/mac-arm64/
 dist/mac/
 node_modules/electron/dist/
 node_modules/
+sha256_from_pass/address
+sha256_from_pass/__pycache__/segwit_addr.cpython-312.pyc
+sha256_from_pass/fulcrum_checker.log
+.DS_Store
